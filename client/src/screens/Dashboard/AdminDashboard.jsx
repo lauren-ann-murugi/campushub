@@ -65,6 +65,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import Avatar from "@/components/Avatar";
 import NotificationBell from "@/components/NotificationBell";
+import { authService } from "@/services/authService";
+import { AdminSettingsSection } from "./admin/SettingsSection";
 import {
   LayoutDashboard,
   Users,
@@ -91,9 +93,15 @@ import {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
 
+function formatMoney(amount) {
+  const value = Number(amount) || 0;
+  if (value >= 1000) return `$${Math.round(value / 1000)}k`;
+  return `$${value.toFixed(0)}`;
+}
+
 export function AdminDashboard() {
   const router = useRouter();
-  const { displayName, signOut } = useAuth();
+  const { displayName, signOut, user, loading: authLoading } = useAuth();
   
   const [activeTab, setActiveTab] = useState("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
@@ -124,21 +132,34 @@ export function AdminDashboard() {
   // Fetch real metrics from FastAPI server
   const fetchDashboardData = useCallback(async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+      const token = authService.getToken();
       if (!token) return;
 
-      const res = await fetch(`${API_BASE_URL}/admin/dashboard-stats`, {
+      const res = await fetch(`${API_BASE_URL}/admin/dashboard`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.ok) {
-        const data = await res.json();
-        if (data.metrics) setMetrics(data.metrics);
-        if (data.pendingAdmissions) setPendingAdmissions(data.pendingAdmissions);
-        if (data.tickets) setSupportTickets(data.tickets);
+        const { stats } = await res.json();
+        if (stats) {
+          setMetrics((current) => ({
+            ...current,
+            totalStudents: {
+              ...current.totalStudents,
+              count: String(stats.total_students),
+              change: `${stats.total_users} portal accounts`,
+            },
+            totalTeachers: { ...current.totalTeachers, count: String(stats.total_teachers) },
+            feeCollection: {
+              ...current.feeCollection,
+              amount: formatMoney(stats.collected_fees_amount),
+              change: `${formatMoney(stats.pending_fees_amount)} outstanding`,
+            },
+          }));
+        }
       }
     } catch (err) {
-      console.warn("Using default frontend dashboard data until FastAPI endpoint responds.", err);
+      console.warn("Using default frontend dashboard data until the API responds.", err);
     } finally {
       setLoading(false);
     }
@@ -147,6 +168,12 @@ export function AdminDashboard() {
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/login");
+    }
+  }, [authLoading, user, router]);
 
   // Sidebar navigation configuration
   const navigationItems = [
@@ -174,6 +201,17 @@ export function AdminDashboard() {
     await signOut();
     router.push("/login");
   };
+
+  const header =
+    activeTab === "settings"
+      ? {
+          title: "Settings",
+          subtitle: "Manage school details, notifications, security and your password.",
+        }
+      : {
+          title: "Dashboard Overview",
+          subtitle: `Welcome back, ${displayName || "Admin"}. Here is what's happening today.`,
+        };
 
   return (
     <div className="flex min-h-screen bg-[#f8f9fc] font-sans antialiased">
@@ -249,10 +287,8 @@ export function AdminDashboard() {
           {/* Top Header Bar */}
           <div className="flex items-center justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-[#111827]">Dashboard Overview</h1>
-              <p className="text-sm text-[#6b7280] mt-0.5">
-                Welcome back, {displayName || "Admin"}. Here is what's happening today.
-              </p>
+              <h1 className="text-2xl font-bold text-[#111827]">{header.title}</h1>
+              <p className="text-sm text-[#6b7280] mt-0.5">{header.subtitle}</p>
             </div>
 
             {/* Global Search and Profile Corner */}
@@ -548,6 +584,8 @@ export function AdminDashboard() {
                 </div>
               </div>
             </div>
+          ) : activeTab === "settings" ? (
+            <AdminSettingsSection />
           ) : (
             /* Selected Active Tab Placeholder Section */
             <div className="rounded-2xl border border-[#e5e7eb] bg-white p-12 text-center shadow-xs">

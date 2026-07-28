@@ -8,6 +8,7 @@ import {
   useState,
   useCallback,
 } from "react";
+import { authService } from "@/services/authService";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
 
@@ -50,12 +51,7 @@ export function AuthProvider({ children }) {
   const [presence, setPresence] = useState(defaultPresence);
   const sessionStartRef = useRef(Date.now());
 
-  const getAuthToken = () => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("token") || "";
-    }
-    return "";
-  };
+  const getAuthToken = () => authService.getToken() || "";
 
   // Fetch current user and profile from FastAPI
   const loadProfileData = useCallback(async () => {
@@ -66,7 +62,7 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/me`, {
+      const res = await fetch(`${API_BASE_URL}/users/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -88,9 +84,7 @@ export function AuthProvider({ children }) {
       });
     } catch (err) {
       console.error("Failed to load user session:", err);
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("token");
-      }
+      authService.logout();
       setUser(null);
       setRole(null);
     } finally {
@@ -159,9 +153,7 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     await sendHeartbeat(false);
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("token");
-    }
+    authService.logout();
     setUser(null);
     setRole(null);
     setAvatarUrl(null);

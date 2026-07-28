@@ -48,10 +48,30 @@
 
 
 from flask import Blueprint, request, jsonify
+from app.api.deps import get_current_user
 from app.services.auth_service import auth_service
 from app.utils.exceptions import error_response
 
 auth_bp = Blueprint("auth", __name__)
+
+
+@auth_bp.route("/me", methods=["GET"])
+def me():
+    """Return the authenticated user for the current token"""
+    user, err = get_current_user()
+    if err:
+        return error_response(err[0], err[1])
+    return jsonify(user.to_dict()), 200
+
+
+@auth_bp.route("/heartbeat", methods=["POST"])
+def heartbeat():
+    """Acknowledge a presence ping from the dashboard"""
+    user, err = get_current_user()
+    if err:
+        return error_response(err[0], err[1])
+    return jsonify({"is_online": True, "user_id": user.id}), 200
+
 
 @auth_bp.route("/register", methods=["POST"])
 def register():

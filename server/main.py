@@ -1,3 +1,5 @@
+import logging
+
 from flask import Flask
 from flask_cors import CORS
 from app.core.config import settings
@@ -35,7 +37,8 @@ def create_app():
 
     @app.errorhandler(Exception)
     def handle_general_exception(error):
-        return error_response(str(error), 500)
+        logging.exception("Unhandled server error", exc_info=error)
+        return error_response("Something went wrong. Please try again.", 500)
 
     # Automatically create SQLite tables inside context
     with app.app_context():
