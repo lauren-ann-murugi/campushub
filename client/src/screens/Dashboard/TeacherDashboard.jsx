@@ -6,7 +6,7 @@ import { DashboardLayout } from "./DashboardLayout";
 import { TeacherOverviewSection } from "./teacher/OverviewSection";
 import { TeacherAttendanceSection } from "./teacher/AttendanceSection";
 import { TeacherStudentsSection } from "./teacher/StudentsSection";
-import { TeacherExamSection } from "./teacher/ExamSection";
+import { TeacherExamsSection } from "./teacher/ExamsSection";
 import { TeacherTimetableSection } from "./teacher/TimetableSection";
 import { SupportSection } from "./student/SupportSection";
 import { SettingsSection } from "./student/SettingsSection";
@@ -25,7 +25,7 @@ export default function TeacherDashboard() {
       )}
       {active === "attendance" && <TeacherAttendanceSection />}
       {active === "students" && <TeacherStudentsSection />}
-      {active === "exams" && <TeacherExamSection />}
+      {active === "exams" && <TeacherExamsSection />}
       {active === "timetable" && <TeacherTimetableSection />}
       {active === "support" && <SupportSection />}
       {active === "settings" && <SettingsSection />}

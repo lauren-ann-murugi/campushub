@@ -3,7 +3,7 @@ import logging
 from flask import Flask
 from flask_cors import CORS
 from app.core.config import settings
-from app.core.database import db, _ensure_user_schema
+from app.core.database import db, _drop_legacy_empty_tables, _ensure_user_schema
 from app.api.router import api_router
 from app.utils.exceptions import error_response
 import app.models  # noqa: F401
@@ -42,6 +42,7 @@ def create_app():
 
     # Automatically create SQLite tables inside context
     with app.app_context():
+        _drop_legacy_empty_tables()
         db.create_all()
         _ensure_user_schema()
 

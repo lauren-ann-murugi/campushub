@@ -1,450 +1,285 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { DashboardHeader, PanelCard, StatCard, Badge } from "../DashboardLayout";
+import { useEffect, useState } from "react";
+
 import {
-  FileText,
-  PlusIcon,
-  CheckIcon,
-  XIcon,
-  SaveIcon,
-  AlertCircleIcon,
-  GraduationCap,
-  EditIcon,
-} from "../../../components/icons";
+  Banner,
+  Button,
+  Card,
+  Cell,
+  Field,
+  Input,
+  Loading,
+  SectionHeader,
+  Select,
+  StatCard,
+  Table,
+  errorMessage,
+  useStatus,
+} from "@/components/portal/PortalUI";
+import { teacherService } from "@/services/teacherService";
 
-const CLASSES = ["JSS 3A", "SS 2B", "SS 1A"];
-
-const INITIAL_EXAMS = [
-  { id: "e1", title: "Midterm Exam", class: "JSS 3A", date: "Jul 25", maxScore: 100, status: "scheduled" },
-  { id: "e2", title: "Quiz 4", class: "SS 2B", date: "Jul 28", maxScore: 20, status: "scheduled" },
-  { id: "e3", title: "Assignment 5", class: "SS 2B", date: "Jul 14", maxScore: 50, status: "graded" },
-  { id: "e4", title: "Term Test", class: "SS 1A", date: "Jul 12", maxScore: 100, status: "graded" },
-];
-
-const INITIAL_ROSTER = {
-  "JSS 3A": [
-    { id: "s1", name: "Ada Okafor" },
-    { id: "s2", name: "Bola Adeyemi" },
-    { id: "s3", name: "Chidi Eze" },
-    { id: "s4", name: "Doris Ojo" },
-    { id: "s5", name: "Emeka Nwosu" },
-  ],
-  "SS 2B": [
-    { id: "s6", name: "Fatima Bello" },
-    { id: "s7", name: "Grace Okon" },
-    { id: "s8", name: "Henry Obi" },
-    { id: "s9", name: "Ifeoma Okoro" },
-  ],
-  "SS 1A": [
-    { id: "s10", name: "John Adeleke" },
-    { id: "s11", name: "Kemi Lawal" },
-    { id: "s12", name: "Lola Bello" },
-  ],
+const EMPTY_FORM = {
+  student_id: "",
+  exam_title: "",
+  subject: "",
+  term: "Term 1",
+  marks_obtained: "",
+  total_marks: "100",
 };
 
-export function TeacherExamSection() {
-  const [exams, setExams] = useState(INITIAL_EXAMS);
-  const [roster, setRoster] = useState(INITIAL_ROSTER);
-  const [showForm, setShowForm] = useState(false);
-  const [gradingExam, setGradingExam] = useState(null);
-  const [grades, setGrades] = useState([]);
-  const [savedGrades, setSavedGrades] = useState(false);
+export function TeacherExamsSection() {
+  const { status, announce } = useStatus();
+  const [classes, setClasses] = useState([]);
+  const [className, setClassName] = useState("");
+  const [students, setStudents] = useState([]);
+  const [results, setResults] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // Form Fields
-  const [title, setTitle] = useState("");
-  const [examClass, setExamClass] = useState(CLASSES[0]);
-  const [date, setDate] = useState("");
-  const [maxScore, setMaxScore] = useState(100);
-  const [formError, setFormError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const load = () => setRefreshKey((key) => key + 1);
 
-  // Fetch real exam data from Python Backend API
   useEffect(() => {
-    async function loadExamsData() {
-      try {
-        setLoading(true);
-        const res = await fetch("/api/teacher/exams");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.exams && data.exams.length > 0) {
-            setExams(data.exams);
-          }
-          if (data.roster) {
-            setRoster(data.roster);
-          }
-        }
-      } catch (err) {
-        // Silently keep default fallback data if API isn't active
-      } finally {
-        setLoading(false);
-      }
+    let cancelled = false;
+
+    Promise.all([
+      teacherService.listStudents(className ? { class_name: className } : {}),
+      teacherService.listResults(className ? { class_name: className } : {}),
+    ])
+      .then(([studentData, resultData]) => {
+        if (cancelled) return;
+        setStudents(studentData.students || []);
+        setClasses(studentData.classes || []);
+        setResults(resultData.results || []);
+        setSummary(resultData.summary || null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        announce("error", errorMessage(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [announce, className, refreshKey]);
+
+  const update = (field) => (event) =>
+    setForm((current) => ({ ...current, [field]: event.target.value }));
+
+  const resetForm = () => {
+    setForm(EMPTY_FORM);
+    setEditingId(null);
+  };
+
+  const startEdit = (result) => {
+    setEditingId(result.id);
+    setForm({
+      student_id: String(result.student_id),
+      exam_title: result.exam_title,
+      subject: result.subject,
+      term: result.term || "Term 1",
+      marks_obtained: String(result.marks_obtained),
+      total_marks: String(result.total_marks),
+    });
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!editingId && !form.student_id) {
+      announce("error", "Select the student this result belongs to.");
+      return;
     }
-    loadExamsData();
-  }, []);
-
-  const handleCreateExam = async (e) => {
-    e.preventDefault();
-    setFormError(null);
-
-    if (!title.trim() || !date.trim()) {
-      setFormError("Please fill in all fields.");
+    if (!form.subject.trim()) {
+      announce("error", "Subject is required.");
       return;
     }
 
-    const formattedDate = new Date(date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-
-    const newExam = {
-      id: `e${Date.now()}`,
-      title: title.trim(),
-      class: examClass,
-      date: formattedDate,
-      maxScore: Number(maxScore),
-      status: "scheduled",
-    };
-
-    setExams((prev) => [newExam, ...prev]);
-
-    // Send to Python backend
-    try {
-      await fetch("/api/teacher/exams", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newExam),
-      });
-    } catch (err) {
-      // Local UI fallback
+    const marks = Number(form.marks_obtained);
+    const total = Number(form.total_marks);
+    if (!Number.isFinite(marks) || !Number.isFinite(total) || total <= 0) {
+      announce("error", "Marks must be numbers and the total must be above zero.");
+      return;
+    }
+    if (marks < 0 || marks > total) {
+      announce("error", `Marks obtained must be between 0 and ${total}.`);
+      return;
     }
 
-    setTitle("");
-    setDate("");
-    setMaxScore(100);
-    setShowForm(false);
-  };
-
-  const openGrading = async (exam) => {
-    setGradingExam(exam);
-    setSavedGrades(false);
-
-    let currentGrades = (roster[exam.class] || []).map((s) => ({
-      studentId: s.id,
-      name: s.name,
-      score: "",
-    }));
-
-    // Fetch existing grades from API if available
+    setSaving(true);
     try {
-      const res = await fetch(`/api/teacher/grades?examId=${exam.id}`);
-      if (res.ok) {
-        const fetchedGrades = await res.json();
-        if (Array.isArray(fetchedGrades) && fetchedGrades.length > 0) {
-          currentGrades = fetchedGrades;
-        }
+      const payload = {
+        exam_title: form.exam_title.trim(),
+        subject: form.subject.trim(),
+        term: form.term,
+        marks_obtained: marks,
+        total_marks: total,
+      };
+
+      if (editingId) {
+        await teacherService.updateResult(editingId, payload);
+        announce("success", "Result updated — the student sees the new mark.");
+      } else {
+        await teacherService.createResult({
+          ...payload,
+          student_id: Number(form.student_id),
+        });
+        announce("success", "Result published to the student portal.");
       }
+
+      resetForm();
+      await load();
     } catch (err) {
-      // Local state fallback
+      announce("error", errorMessage(err));
+    } finally {
+      setSaving(false);
     }
-
-    setGrades(currentGrades);
   };
 
-  const setScore = (studentId, score) => {
-    setGrades((prev) =>
-      prev.map((g) => (g.studentId === studentId ? { ...g, score } : g))
-    );
-    setSavedGrades(false);
-  };
-
-  const handleSaveGrades = async () => {
-    if (!gradingExam) return;
-
-    const updatedExams = exams.map((e) =>
-      e.id === gradingExam.id ? { ...e, status: "graded" } : e
-    );
-    setExams(updatedExams);
-
+  const handleDelete = async (result) => {
     try {
-      await fetch("/api/teacher/grades", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          examId: gradingExam.id,
-          grades,
-        }),
-      });
+      await teacherService.deleteResult(result.id);
+      announce("success", "Result removed from the student portal.");
+      if (editingId === result.id) resetForm();
+      await load();
     } catch (err) {
-      // Local UI fallback
+      announce("error", errorMessage(err));
     }
-
-    setSavedGrades(true);
-    setTimeout(() => {
-      setGradingExam(null);
-      setSavedGrades(false);
-    }, 1800);
   };
-
-  const enteredCount = grades.filter((g) => g.score !== "").length;
 
   return (
-    <>
-      <DashboardHeader
-        title="Exams"
-        subtitle="Create exams and enter grades for your classes."
-        action={
-          <button
-            onClick={() => setShowForm((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#004ac6] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#003ba6] transition-colors"
-          >
-            <PlusIcon className="h-4 w-4" /> New exam
-          </button>
-        }
-      />
+    <div className="space-y-5">
+      <SectionHeader
+        title="Exams and results"
+        description="Marks you record here appear under Results in the student portal and in the admin portal."
+      >
+        <Select
+          value={className}
+          onChange={(event) => setClassName(event.target.value)}
+          options={classes}
+          placeholder="All my classes"
+        />
+      </SectionHeader>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Total Exams" value={String(exams.length)} icon={<FileText className="h-5 w-5" />} accent="blue" />
-        <StatCard label="Scheduled" value={String(exams.filter((e) => e.status === "scheduled").length)} icon={<GraduationCap className="h-5 w-5" />} accent="amber" />
-        <StatCard label="Graded" value={String(exams.filter((e) => e.status === "graded").length)} icon={<CheckIcon className="h-5 w-5" />} accent="green" />
-        <StatCard label="Drafts" value={String(exams.filter((e) => e.status === "draft").length)} icon={<FileText className="h-5 w-5" />} accent="gray" />
+      <Banner status={status} />
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Results recorded" value={summary?.exams ?? 0} />
+        <StatCard label="Class average" value={`${summary?.average ?? 0}%`} />
+        <StatCard label="Top subject" value={summary?.best_subject || "—"} />
       </div>
 
-      {showForm && (
-        <div className="mb-6 rounded-2xl border border-[#e6e8ea] bg-white p-5 shadow-[0px_1px_2px_#0000000d]">
-          <h3 className="mb-4 text-base font-semibold text-[#191c1e]">Create New Exam</h3>
-          {formError && (
-            <div className="mb-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
-              <AlertCircleIcon className="h-4 w-4" /> {formError}
-            </div>
-          )}
-          <form onSubmit={handleCreateExam} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="flex flex-col gap-2">
-              <label htmlFor="ex-title" className="text-sm font-medium text-[#191c1e]">Title</label>
-              <input
-                id="ex-title"
-                type="text"
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Midterm Exam"
-                className="rounded-lg border border-[#c3c6d7] bg-white px-4 py-2.5 text-sm text-[#191c1e] placeholder:text-[#434655]/50 focus:border-[#004ac6] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/20"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label htmlFor="ex-class" className="text-sm font-medium text-[#191c1e]">Class</label>
-              <select
-                id="ex-class"
-                value={examClass}
-                onChange={(e) => setExamClass(e.target.value)}
-                className="rounded-lg border border-[#c3c6d7] bg-white px-4 py-2.5 text-sm text-[#191c1e] focus:border-[#004ac6] focus:outline-none"
-              >
-                {CLASSES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <label htmlFor="ex-date" className="text-sm font-medium text-[#191c1e]">Date</label>
-              <input
-                id="ex-date"
-                type="date"
-                required
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="rounded-lg border border-[#c3c6d7] bg-white px-4 py-2.5 text-sm text-[#191c1e] focus:border-[#004ac6] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/20"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label htmlFor="ex-max" className="text-sm font-medium text-[#191c1e]">Max Score</label>
-              <input
-                id="ex-max"
-                type="number"
-                min={1}
-                value={maxScore}
-                onChange={(e) => setMaxScore(Number(e.target.value))}
-                className="rounded-lg border border-[#c3c6d7] bg-white px-4 py-2.5 text-sm text-[#191c1e] focus:border-[#004ac6] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/20"
-              />
-            </div>
-            <div className="flex gap-3 sm:col-span-2 lg:col-span-4">
-              <button
-                type="submit"
-                className="inline-flex items-center gap-2 rounded-lg bg-[#004ac6] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#003ba6] transition-colors"
-              >
-                <PlusIcon className="h-4 w-4" /> Create exam
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="rounded-lg border border-[#c3c6d7] px-5 py-2.5 text-sm font-medium text-[#434655] hover:bg-[#f7f9fb] transition-colors"
-              >
+      <Card
+        title={editingId ? "Edit result" : "Record a result"}
+        description={
+          editingId
+            ? "Update the mark and the student's portal reflects it immediately."
+            : "Enter a mark for one of your students."
+        }
+      >
+        <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Student">
+            <Select
+              value={form.student_id}
+              onChange={update("student_id")}
+              disabled={Boolean(editingId)}
+              placeholder="Select a student"
+              options={students.map((student) => ({
+                value: String(student.id),
+                label: `${student.name} · ${student.registration_number}`,
+              }))}
+            />
+          </Field>
+          <Field label="Exam">
+            <Input
+              value={form.exam_title}
+              onChange={update("exam_title")}
+              placeholder="Mid-term exam"
+            />
+          </Field>
+          <Field label="Subject">
+            <Input value={form.subject} onChange={update("subject")} placeholder="Mathematics" />
+          </Field>
+          <Field label="Term">
+            <Select
+              value={form.term}
+              onChange={update("term")}
+              options={["Term 1", "Term 2", "Term 3"]}
+            />
+          </Field>
+          <Field label="Marks obtained">
+            <Input
+              type="number"
+              value={form.marks_obtained}
+              onChange={update("marks_obtained")}
+              min="0"
+            />
+          </Field>
+          <Field label="Out of">
+            <Input
+              type="number"
+              value={form.total_marks}
+              onChange={update("total_marks")}
+              min="1"
+            />
+          </Field>
+
+          <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-3">
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving…" : editingId ? "Update result" : "Publish result"}
+            </Button>
+            {editingId ? (
+              <Button type="button" variant="secondary" onClick={resetForm}>
                 Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+              </Button>
+            ) : null}
+          </div>
+        </form>
+      </Card>
 
-      <PanelCard title="Exam List">
+      <Card title="Published results">
         {loading ? (
-          <div className="flex items-center justify-center py-12 text-sm text-[#434655]">
-            Loading exams list...
-          </div>
-        ) : exams.length === 0 ? (
-          <div className="py-12 text-center text-sm text-[#434655]">
-            No exams created yet.
-          </div>
+          <Loading />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-[#eceef0]">
-                  <th className="pb-3 text-xs font-medium text-[#434655]">Title</th>
-                  <th className="pb-3 text-xs font-medium text-[#434655]">Class</th>
-                  <th className="pb-3 text-xs font-medium text-[#434655]">Date</th>
-                  <th className="pb-3 text-right text-xs font-medium text-[#434655]">Max Score</th>
-                  <th className="pb-3 text-center text-xs font-medium text-[#434655]">Status</th>
-                  <th className="pb-3 text-right text-xs font-medium text-[#434655]">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {exams.map((exam) => (
-                  <tr key={exam.id} className="border-b border-[#f0f1f3] last:border-0 hover:bg-[#f7f9fb]/50 transition-colors">
-                    <td className="py-3 text-sm font-medium text-[#191c1e]">{exam.title}</td>
-                    <td className="py-3 text-sm text-[#434655]">{exam.class}</td>
-                    <td className="py-3 text-sm text-[#434655]">{exam.date}</td>
-                    <td className="py-3 text-right text-sm text-[#434655]">{exam.maxScore}</td>
-                    <td className="py-3 text-center">
-                      <Badge variant={exam.status === "graded" ? "green" : exam.status === "scheduled" ? "amber" : "gray"}>
-                        {exam.status.charAt(0).toUpperCase() + exam.status.slice(1)}
-                      </Badge>
-                    </td>
-                    <td className="py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => openGrading(exam)}
-                        className="inline-flex items-center gap-1.5 text-sm font-medium text-[#004ac6] hover:underline"
-                      >
-                        {exam.status === "graded" ? (
-                          <>
-                            <EditIcon className="h-4 w-4" /> Edit grades
-                          </>
-                        ) : (
-                          <>
-                            <FileText className="h-4 w-4" /> Enter grades
-                          </>
-                        )}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </PanelCard>
-
-      {/* Grading Modal */}
-      {gradingExam && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
-          onClick={() => setGradingExam(null)}
-        >
-          <div
-            className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-[#191c1e]">
-                  {gradingExam.title} — Grades
-                </h3>
-                <p className="text-sm text-[#434655]">
-                  {gradingExam.class} · Max score: {gradingExam.maxScore}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setGradingExam(null)}
-                className="text-[#434655] hover:text-[#191c1e]"
-              >
-                <XIcon className="h-5 w-5" />
-              </button>
-            </div>
-
-            {savedGrades ? (
-              <div className="flex flex-col items-center gap-3 py-8 text-center">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#006c491a]">
-                  <CheckIcon className="h-6 w-6 text-[#006c49]" />
-                </span>
-                <p className="text-sm font-medium text-[#191c1e]">Grades saved successfully!</p>
-              </div>
-            ) : (
-              <>
-                <div className="max-h-[400px] overflow-y-auto">
-                  {grades.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-[#434655]">
-                      No roster students found for this class.
-                    </p>
-                  ) : (
-                    <ul className="flex flex-col gap-2">
-                      {grades.map((g) => (
-                        <li
-                          key={g.studentId}
-                          className="flex items-center justify-between gap-3 rounded-lg border border-[#e6e8ea] p-3 transition-colors hover:border-[#c3c6d7]"
-                        >
-                          <p className="text-sm font-medium text-[#191c1e]">{g.name}</p>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min={0}
-                              max={gradingExam.maxScore}
-                              value={g.score}
-                              onChange={(e) =>
-                                setScore(
-                                  g.studentId,
-                                  e.target.value === "" ? "" : Number(e.target.value)
-                                )
-                              }
-                              placeholder="—"
-                              className="w-20 rounded-lg border border-[#c3c6d7] bg-white px-3 py-2 text-right text-sm text-[#191c1e] focus:border-[#004ac6] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/20"
-                            />
-                            <span className="text-xs text-[#434655]">/ {gradingExam.maxScore}</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <div className="mt-4 flex items-center justify-between">
-                  <p className="text-xs text-[#434655]">
-                    {enteredCount} of {grades.length} graded
-                  </p>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setGradingExam(null)}
-                      className="rounded-lg border border-[#c3c6d7] px-4 py-2 text-sm font-medium text-[#434655] hover:bg-[#f7f9fb] transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveGrades}
-                      disabled={enteredCount === 0}
-                      className="inline-flex items-center gap-2 rounded-lg bg-[#004ac6] px-5 py-2 text-sm font-medium text-white hover:bg-[#003ba6] disabled:opacity-50 transition-colors"
-                    >
-                      <SaveIcon className="h-4 w-4" /> Save grades
-                    </button>
+          <Table
+            columns={["Student", "Exam", "Subject", "Marks", "Grade", ""]}
+            rows={results}
+            empty="No results recorded yet."
+            renderRow={(result) => (
+              <tr key={result.id}>
+                <Cell className="font-medium text-[#111827]">{result.student_name}</Cell>
+                <Cell>{result.exam_title || "—"}</Cell>
+                <Cell>{result.subject}</Cell>
+                <Cell>
+                  {result.marks_obtained}/{result.total_marks} ({result.percentage}%)
+                </Cell>
+                <Cell className="font-semibold text-[#111827]">{result.grade}</Cell>
+                <Cell>
+                  <div className="flex gap-2">
+                    <Button variant="secondary" onClick={() => startEdit(result)}>
+                      Edit
+                    </Button>
+                    <Button variant="danger" onClick={() => handleDelete(result)}>
+                      Delete
+                    </Button>
                   </div>
-                </div>
-              </>
+                </Cell>
+              </tr>
             )}
-          </div>
-        </div>
-      )}
-    </>
+          />
+        )}
+      </Card>
+    </div>
   );
 }
+
+export const TeacherExamSection = TeacherExamsSection;
+
+export default TeacherExamsSection;

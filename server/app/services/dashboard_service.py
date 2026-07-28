@@ -6,6 +6,8 @@ from app.models.teacher import TeacherProfile
 from app.models.fee import FeeRecord
 from app.models.exam import ExamResult
 from app.models.announcement import Announcement
+from app.models.attendance import AttendanceRecord
+from app.services import portal_service
 
 class DashboardService:
     @staticmethod
@@ -16,15 +18,14 @@ class DashboardService:
         total_users = User.query.count()
         total_students = Student.query.count()
         total_teachers = TeacherProfile.query.count()
-        
-        # Fee metrics
-        pending_fees = db.session.query(
-            db.func.sum(FeeRecord.amount)
-        ).filter(FeeRecord.status == "pending").scalar() or 0.0
+        total_classes = len(portal_service.known_classes())
 
-        collected_fees = db.session.query(
-            db.func.sum(FeeRecord.amount)
-        ).filter(FeeRecord.status == "paid").scalar() or 0.0
+        fees: List[FeeRecord] = FeeRecord.query.all()
+        collected_fees = sum(f.amount_paid or 0.0 for f in fees)
+        pending_fees = sum(f.balance for f in fees)
+
+        attendance: List[AttendanceRecord] = AttendanceRecord.query.all()
+        attendance_rate = portal_service.attendance_summary(attendance)["rate"]
 
         recent_announcements = Announcement.query.order_by(
             Announcement.created_at.desc()
@@ -35,6 +36,8 @@ class DashboardService:
                 "total_users": total_users,
                 "total_students": total_students,
                 "total_teachers": total_teachers,
+                "total_classes": total_classes,
+                "attendance_rate": attendance_rate,
                 "pending_fees_amount": float(pending_fees),
                 "collected_fees_amount": float(collected_fees),
             },
