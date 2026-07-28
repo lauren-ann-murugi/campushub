@@ -1,3 +1,4 @@
+import RequireRole from "@/components/RequireRole";
 import AdminDashboard from "@/screens/Dashboard/AdminDashboard";
 
 export const metadata = {
@@ -6,5 +7,9 @@ export const metadata = {
 };
 
 export default function AdministratorDashboardPage() {
-  return <AdminDashboard />;
+  return (
+    <RequireRole role="administrator">
+      <AdminDashboard />
+    </RequireRole>
+  );
 }

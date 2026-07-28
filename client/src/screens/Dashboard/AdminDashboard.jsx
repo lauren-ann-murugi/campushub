@@ -60,13 +60,22 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import Avatar from "@/components/Avatar";
 import NotificationBell from "@/components/NotificationBell";
-import { authService } from "@/services/authService";
+import { adminService } from "@/services/adminService";
 import { AdminSettingsSection } from "./admin/SettingsSection";
+import { AdminAnnouncementsSection } from "./admin/portal/AnnouncementsSection";
+import { AdminFeesSection } from "./admin/portal/FeesSection";
+import { AdminStudentsSection } from "./admin/portal/StudentsSection";
+import { AdminTeachersSection } from "./admin/portal/TeachersSection";
+import {
+  AdminAttendanceSection,
+  AdminResultsSection,
+  AdminTimetableSection,
+} from "./admin/portal/AcademicsSections";
 import {
   LayoutDashboard,
   Users,
@@ -91,8 +100,6 @@ import {
   Clock,
 } from "lucide-react";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
-
 function formatMoney(amount) {
   const value = Number(amount) || 0;
   if (value >= 1000) return `$${Math.round(value / 1000)}k`;
@@ -105,15 +112,14 @@ export function AdminDashboard() {
   
   const [activeTab, setActiveTab] = useState("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
 
   // Backend Metrics State
   const [metrics, setMetrics] = useState({
-    totalStudents: { count: "2,450", change: "+12% from last month", isPositive: true },
-    totalTeachers: { count: "184", note: "Stable" },
-    totalClasses: { count: "72", note: "Across 4 blocks" },
-    attendanceRate: { value: "94%", change: "-2% from yesterday", isPositive: false },
-    feeCollection: { amount: "$45k", change: "85% collected", isPositive: true },
+    totalStudents: { count: "—", change: "Loading…", isPositive: true },
+    totalTeachers: { count: "—", note: "Loading…" },
+    totalClasses: { count: "—", note: "Loading…" },
+    attendanceRate: { value: "—", change: "Loading…", isPositive: true },
+    feeCollection: { amount: "—", change: "Loading…", isPositive: true },
   });
 
   const [pendingAdmissions, setPendingAdmissions] = useState([
@@ -129,45 +135,42 @@ export function AdminDashboard() {
     { id: "#TK-4032", subject: "Schedule Adjustment Request", requester: "Mrs. Lee (Admin)", status: "OPEN", type: "open" },
   ]);
 
-  // Fetch real metrics from FastAPI server
-  const fetchDashboardData = useCallback(async () => {
-    try {
-      const token = authService.getToken();
-      if (!token) return;
+  // Live school metrics from the API
+  useEffect(() => {
+    let cancelled = false;
 
-      const res = await fetch(`${API_BASE_URL}/admin/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` },
+    adminService
+      .getDashboard()
+      .then(({ stats }) => {
+        if (cancelled || !stats) return;
+        setMetrics({
+          totalStudents: {
+            count: String(stats.total_students),
+            change: `${stats.total_users} portal accounts`,
+            isPositive: true,
+          },
+          totalTeachers: { count: String(stats.total_teachers), note: "On payroll" },
+          totalClasses: { count: String(stats.total_classes), note: "With students or lessons" },
+          attendanceRate: {
+            value: `${stats.attendance_rate}%`,
+            change: "Across all recorded registers",
+            isPositive: stats.attendance_rate >= 75,
+          },
+          feeCollection: {
+            amount: formatMoney(stats.collected_fees_amount),
+            change: `${formatMoney(stats.pending_fees_amount)} outstanding`,
+            isPositive: true,
+          },
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to load dashboard metrics", err);
       });
 
-      if (res.ok) {
-        const { stats } = await res.json();
-        if (stats) {
-          setMetrics((current) => ({
-            ...current,
-            totalStudents: {
-              ...current.totalStudents,
-              count: String(stats.total_students),
-              change: `${stats.total_users} portal accounts`,
-            },
-            totalTeachers: { ...current.totalTeachers, count: String(stats.total_teachers) },
-            feeCollection: {
-              ...current.feeCollection,
-              amount: formatMoney(stats.collected_fees_amount),
-              change: `${formatMoney(stats.pending_fees_amount)} outstanding`,
-            },
-          }));
-        }
-      }
-    } catch (err) {
-      console.warn("Using default frontend dashboard data until the API responds.", err);
-    } finally {
-      setLoading(false);
-    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -182,6 +185,7 @@ export function AdminDashboard() {
     { id: "teachers", label: "Teachers", icon: GraduationCap },
     { id: "admissions", label: "Admissions", icon: UserPlus },
     { id: "attendance", label: "Attendance", icon: CalendarCheck },
+    { id: "timetable", label: "Timetable", icon: Clock },
     { id: "examinations", label: "Examinations", icon: FileSpreadsheet },
     { id: "results", label: "Results", icon: Award },
     { id: "fees", label: "Fees", icon: Wallet },
@@ -202,16 +206,43 @@ export function AdminDashboard() {
     router.push("/login");
   };
 
-  const header =
-    activeTab === "settings"
-      ? {
-          title: "Settings",
-          subtitle: "Manage school details, notifications, security and your password.",
-        }
-      : {
-          title: "Dashboard Overview",
-          subtitle: `Welcome back, ${displayName || "Admin"}. Here is what's happening today.`,
-        };
+  const SECTIONS = {
+    students: AdminStudentsSection,
+    teachers: AdminTeachersSection,
+    attendance: AdminAttendanceSection,
+    timetable: AdminTimetableSection,
+    results: AdminResultsSection,
+    fees: AdminFeesSection,
+    announcements: AdminAnnouncementsSection,
+    settings: AdminSettingsSection,
+  };
+
+  const ActiveSection = SECTIONS[activeTab];
+
+  const HEADERS = {
+    settings: {
+      title: "Settings",
+      subtitle: "Manage school details, notifications, security and your password.",
+    },
+    students: { title: "Students", subtitle: "Enrolment and class assignments." },
+    teachers: { title: "Teachers", subtitle: "Teaching staff and payroll." },
+    attendance: {
+      title: "Attendance",
+      subtitle: "Registers saved by teachers across every class.",
+    },
+    timetable: { title: "Timetable", subtitle: "Lessons scheduled for each class." },
+    results: { title: "Results", subtitle: "Exam results published to students." },
+    fees: { title: "Fees", subtitle: "Invoices and payments for students." },
+    announcements: {
+      title: "Announcements",
+      subtitle: "Send notices to the teacher and student portals.",
+    },
+  };
+
+  const header = HEADERS[activeTab] || {
+    title: "Dashboard Overview",
+    subtitle: `Welcome back, ${displayName || "Admin"}. Here is what's happening today.`,
+  };
 
   return (
     <div className="flex min-h-screen bg-[#f8f9fc] font-sans antialiased">
@@ -584,8 +615,8 @@ export function AdminDashboard() {
                 </div>
               </div>
             </div>
-          ) : activeTab === "settings" ? (
-            <AdminSettingsSection />
+          ) : ActiveSection ? (
+            <ActiveSection />
           ) : (
             /* Selected Active Tab Placeholder Section */
             <div className="rounded-2xl border border-[#e5e7eb] bg-white p-12 text-center shadow-xs">

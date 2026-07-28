@@ -1,22 +1,4 @@
-# from datetime import datetime
-# from sqlalchemy import Column, DateTime, ForeignKey, String
-# from sqlalchemy.orm import relationship
-# from app.core.database import Base
-
-
-# class Teacher(Base):
-#     __tablename__ = "teachers"
-
-#     id = Column(String, primary_key=True, index=True)
-#     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
-#     employee_number = Column(String, nullable=True)
-#     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-#     user = relationship("User", back_populates="teacher_profile")
-
-
-
-
+from datetime import datetime
 from app.core.database import db
 
 class TeacherProfile(db.Model):
@@ -26,13 +8,25 @@ class TeacherProfile(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     employee_id = db.Column(db.String(50), unique=True, nullable=False)
     department = db.Column(db.String(100), nullable=False)
+    subject = db.Column(db.String(100), default="")
+    # Comma separated class names the teacher is responsible for, e.g. "Grade 10A,Grade 11B"
+    classes = db.Column(db.String(255), default="")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship("User", back_populates="teacher_profile")
+
+    @property
+    def class_list(self):
+        return [c.strip() for c in (self.classes or "").split(",") if c.strip()]
 
     def to_dict(self):
         return {
             "id": self.id,
             "user_id": self.user_id,
+            "name": self.user.name if self.user else "",
+            "email": self.user.email if self.user else "",
             "employee_id": self.employee_id,
             "department": self.department,
+            "subject": self.subject or "",
+            "classes": self.class_list,
         }
