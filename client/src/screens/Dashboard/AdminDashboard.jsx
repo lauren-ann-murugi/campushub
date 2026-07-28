@@ -65,6 +65,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import Avatar from "@/components/Avatar";
 import NotificationBell from "@/components/NotificationBell";
+import { authService } from "@/services/authService";
+import { AdminSettingsSection } from "./admin/SettingsSection";
 import {
   LayoutDashboard,
   Users,
@@ -124,7 +126,7 @@ export function AdminDashboard() {
   // Fetch real metrics from FastAPI server
   const fetchDashboardData = useCallback(async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+      const token = authService.getToken();
       if (!token) return;
 
       const res = await fetch(`${API_BASE_URL}/admin/dashboard-stats`, {
@@ -174,6 +176,17 @@ export function AdminDashboard() {
     await signOut();
     router.push("/login");
   };
+
+  const header =
+    activeTab === "settings"
+      ? {
+          title: "Settings",
+          subtitle: "Manage school details, notifications, security and your password.",
+        }
+      : {
+          title: "Dashboard Overview",
+          subtitle: `Welcome back, ${displayName || "Admin"}. Here is what's happening today.`,
+        };
 
   return (
     <div className="flex min-h-screen bg-[#f8f9fc] font-sans antialiased">
@@ -249,10 +262,8 @@ export function AdminDashboard() {
           {/* Top Header Bar */}
           <div className="flex items-center justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-[#111827]">Dashboard Overview</h1>
-              <p className="text-sm text-[#6b7280] mt-0.5">
-                Welcome back, {displayName || "Admin"}. Here is what's happening today.
-              </p>
+              <h1 className="text-2xl font-bold text-[#111827]">{header.title}</h1>
+              <p className="text-sm text-[#6b7280] mt-0.5">{header.subtitle}</p>
             </div>
 
             {/* Global Search and Profile Corner */}
@@ -548,6 +559,8 @@ export function AdminDashboard() {
                 </div>
               </div>
             </div>
+          ) : activeTab === "settings" ? (
+            <AdminSettingsSection />
           ) : (
             /* Selected Active Tab Placeholder Section */
             <div className="rounded-2xl border border-[#e5e7eb] bg-white p-12 text-center shadow-xs">

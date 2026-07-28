@@ -8,7 +8,8 @@
 
 
 from app.models.admin import Administrator
+from app.models.setting import AdminSetting
 from app.models.student import Student
 from app.models.user import User
 
-__all__ = ["Administrator", "Student", "User"]
+__all__ = ["AdminSetting", "Administrator", "Student", "User"]
