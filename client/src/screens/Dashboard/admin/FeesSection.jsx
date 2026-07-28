@@ -1,593 +1,700 @@
+
+// src/screens/Dashboard/admin/FeesSection.jsx
+
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useState, useEffect } from 'react';
+import { 
+  Wallet, 
+  Search, 
+  Filter, 
+  Download, 
+  Eye, 
+  CheckCircle, 
+  XCircle, 
+  Clock, 
+  AlertCircle,
+  Loader2,
+  Plus,
+  ChevronDown,
+  FileText,
+  Printer,
+  Mail,
+  Calendar,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  Users,
+  CreditCard,
+  Receipt,
+  ArrowUpRight,
+  ArrowDownRight,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Send,
+  RefreshCw
+} from 'lucide-react';
 
-export function AdminExamsSection() {
-  const [exams, setExams] = useState([]);
+// CHANGE: Use environment variable with correct endpoint for admin fees
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+
+export function AdminFeesSection() {
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [deleteId, setDeleteId] = useState(null);
-  const [actionNotice, setActionNotice] = useState(null);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('All');
+  const [selectedRole, setSelectedRole] = useState('All');
+  
+  // State for admin fees data
+  const [feesData, setFeesData] = useState({
+    admins: [],
+    summary: {
+      totalPayroll: 0,
+      totalPaid: 0,
+      totalPending: 0,
+      totalOverdue: 0,
+      paymentRate: 0
+    },
+    recentTransactions: []
+  });
 
-  // Form input states
-  const [title, setTitle] = useState("");
-  const [className, setClassName] = useState("Grade 10 • Sec A, B");
-  const [venue, setVenue] = useState("Main Hall A");
-  const [examDate, setExamDate] = useState("");
-  const [examTime, setExamTime] = useState("09:00 AM - 11:30 AM");
-  const [submitting, setSubmitting] = useState(false);
+  // Modal states
+  const [isAddFeeModalOpen, setIsAddFeeModalOpen] = useState(false);
+  const [isAssignStudentFeeModalOpen, setIsAssignStudentFeeModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedAdmin, setSelectedAdmin] = useState(null);
+  const [showAllTransactions, setShowAllTransactions] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    adminId: '',
+    adminName: '',
+    role: 'Administrator',
+    salary: '',
+    dueDate: '',
+    status: 'pending'
+  });
 
-  // Load Examinations Data from Custom Python Backend
-  const loadExams = async () => {
+  const [studentFeeForm, setStudentFeeForm] = useState({
+    recipient: "all",
+    studentIdentifier: "",
+    amount: "",
+    semester: "First Semester",
+    activity: "Tuition",
+    dueDate: "",
+  });
+
+  // Fetch admin fees data from API
+  useEffect(() => {
+    fetchFeesData();
+  }, []);
+
+  const fetchFeesData = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const res = await fetch("/api/exams");
-      if (!res.ok) throw new Error("Failed to fetch exams");
-      const data = await res.json();
-      setExams(data.exams || []);
+      const token = localStorage.getItem('token');
+      // CHANGE: Use /admin/fees instead of /fees
+      const response = await fetch(`${API_BASE_URL}/admin/fees`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch admin fees data');
+      }
+
+      const data = await response.json();
+      setFeesData(data);
     } catch (err) {
-      // Fallback mock data matching exact UI reference
-      setExams([
-        {
-          id: "1",
-          title: "Mid-Term Mathematics",
-          class_name: "Grade 10 • Sec A, B",
-          exam_date: "Oct 24, 2023",
-          exam_time: "09:00 AM - 11:30 AM",
-          venue: "Main Hall A",
-          status: "Scheduled",
+      setError(err.message || 'Error loading admin fees data');
+      // Set fallback mock data for demonstration
+      setFeesData({
+        admins: [
+          { id: '1', name: 'John Administrator', role: 'Principal', salary: 120000, paid: 120000, status: 'paid', dueDate: '2026-07-30' },
+          { id: '2', name: 'Sarah Manager', role: 'Finance Manager', salary: 95000, paid: 47500, status: 'partial', dueDate: '2026-07-15' },
+          { id: '3', name: 'Michael Coordinator', role: 'Academic Coordinator', salary: 88000, paid: 0, status: 'overdue', dueDate: '2026-06-30' },
+          { id: '4', name: 'Emily Director', role: 'HR Director', salary: 105000, paid: 105000, status: 'paid', dueDate: '2026-07-28' },
+          { id: '5', name: 'Robert Officer', role: 'Admissions Officer', salary: 78000, paid: 39000, status: 'partial', dueDate: '2026-08-01' },
+        ],
+        summary: {
+          totalPayroll: 486000,
+          totalPaid: 311500,
+          totalPending: 174500,
+          totalOverdue: 88000,
+          paymentRate: 64
         },
-        {
-          id: "2",
-          title: "Physics Final Practical",
-          class_name: "Grade 12 • Science",
-          exam_date: "Oct 26, 2023",
-          exam_time: "13:00 PM - 16:00 PM",
-          venue: "Science Lab 3",
-          status: "Pending Invigilator",
-        },
-        {
-          id: "3",
-          title: "Literature Essay",
-          class_name: "Grade 11 • Arts",
-          exam_date: "Oct 28, 2023",
-          exam_time: "10:00 AM - 12:00 PM",
-          venue: "Room 402",
-          status: "Ready",
-        },
-        {
-          id: "4",
-          title: "History Quiz 4",
-          class_name: "Grade 9 • All",
-          exam_date: "Oct 20, 2023",
-          exam_time: "08:00 AM - 09:00 AM",
-          venue: "Online Platform",
-          status: "Completed",
-        },
-      ]);
+        recentTransactions: [
+          { id: 'TXN-201', admin: 'John Administrator', amount: 120000, date: '2026-07-30', status: 'completed', method: 'Bank Transfer' },
+          { id: 'TXN-202', admin: 'Emily Director', amount: 105000, date: '2026-07-28', status: 'completed', method: 'Bank Transfer' },
+          { id: 'TXN-203', admin: 'Sarah Manager', amount: 47500, date: '2026-07-15', status: 'pending', method: 'Cash' },
+          { id: 'TXN-204', admin: 'Michael Coordinator', amount: 88000, date: '2026-06-30', status: 'failed', method: 'Bank Transfer' },
+        ]
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadExams();
-  }, []);
-
-  // Submit New Exam
-  const handleCreateExam = async (e) => {
+  // Handle adding new admin fee record
+  const handleAddFee = async (e) => {
     e.preventDefault();
-    setSubmitting(true);
-
-    const payload = {
-      title,
-      class_name: className,
-      venue,
-      exam_date: examDate || "Oct 30, 2023",
-      exam_time: examTime,
-      status: "Scheduled",
-    };
-
+    setIsSubmitting(true);
     try {
-      const res = await fetch("/api/exams", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      const token = localStorage.getItem('token');
+      // CHANGE: Use /admin/fees instead of /fees
+      const response = await fetch(`${API_BASE_URL}/admin/fees`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
       });
 
-      if (!res.ok) throw new Error("Failed to create exam");
+      if (!response.ok) {
+        throw new Error('Failed to add admin fee record');
+      }
 
-      setActionNotice("Exam scheduled successfully!");
-      setShowForm(false);
-      resetForm();
-      loadExams();
+      await fetchFeesData(); // Refresh data
+      setIsAddFeeModalOpen(false);
+      setFormData({ adminId: '', adminName: '', role: 'Administrator', salary: '', dueDate: '', status: 'pending' });
     } catch (err) {
-      // Optimistic client update fallback
-      setExams((prev) => [{ id: String(Date.now()), ...payload }, ...prev]);
-      setActionNotice("Exam scheduled!");
-      setShowForm(false);
-      resetForm();
+      alert(err.message);
     } finally {
-      setSubmitting(false);
-      setTimeout(() => setActionNotice(null), 3000);
+      setIsSubmitting(false);
     }
   };
 
-  const resetForm = () => {
-    setTitle("");
-    setVenue("Main Hall A");
-    setExamDate("");
-  };
-
-  // Delete Exam
-  const handleDeleteExam = async (id) => {
+  const handleAssignStudentFee = async (event) => {
+    event.preventDefault();
+    if (studentFeeForm.recipient === "individual" && !studentFeeForm.studentIdentifier.trim()) {
+      alert("Enter the student email address or student ID.");
+      return;
+    }
+    setIsSubmitting(true);
     try {
-      await fetch(`/api/exams?id=${id}`, { method: "DELETE" });
-      setExams((prev) => prev.filter((e) => e.id !== id));
-      setActionNotice("Exam deleted successfully.");
+      const response = await fetch("/api/fees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          student_name: studentFeeForm.recipient === "all" ? "All Students" : studentFeeForm.studentIdentifier.trim(),
+          student_identifier: studentFeeForm.recipient === "all" ? "all-students" : studentFeeForm.studentIdentifier.trim(),
+          recipient: studentFeeForm.recipient,
+          amount: studentFeeForm.amount,
+          semester: studentFeeForm.semester,
+          activity: studentFeeForm.activity,
+          due_date: studentFeeForm.dueDate,
+          status: "Pending",
+          method: "Not paid",
+        }),
+      });
+      if (!response.ok) throw new Error("Unable to assign the fee.");
+      setIsAssignStudentFeeModalOpen(false);
+      setStudentFeeForm({ recipient: "all", studentIdentifier: "", amount: "", semester: "First Semester", activity: "Tuition", dueDate: "" });
+      alert("Student fee assigned successfully.");
     } catch (err) {
-      setExams((prev) => prev.filter((e) => e.id !== id));
-      setActionNotice("Exam deleted.");
+      alert(err.message || "Unable to assign the fee.");
     } finally {
-      setDeleteId(null);
-      setTimeout(() => setActionNotice(null), 3000);
+      setIsSubmitting(false);
     }
   };
 
-  // Quick Action Button Handlers
-  const handleQuickAction = (actionName) => {
-    setActionNotice(`Triggered: ${actionName}`);
-    setTimeout(() => setActionNotice(null), 3000);
+  const handleSendReminder = (admin) => {
+    alert("Payment reminder prepared for " + admin.name + ".");
   };
 
-  // Status Badge Component Helper
-  const renderStatusBadge = (status) => {
-    switch (status) {
-      case "Scheduled":
-        return <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600">Scheduled</span>;
-      case "Pending Invigilator":
-        return <span className="rounded-md bg-red-100/70 px-2.5 py-1 text-xs font-semibold text-red-600">Pending Invigilator</span>;
-      case "Ready":
-        return <span className="rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">Ready</span>;
-      case "Completed":
-        return <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-500">Completed</span>;
-      default:
-        return <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600">{status}</span>;
+  const handleDeleteRecord = (admin) => {
+    if (!window.confirm("Delete the salary record for " + admin.name + "?")) return;
+    setFeesData((current) => ({ ...current, admins: current.admins.filter((item) => item.id !== admin.id) }));
+    if (selectedAdmin?.id === admin.id) {
+      setSelectedAdmin(null);
+      setIsViewModalOpen(false);
     }
   };
 
-  // Filtered Exams Search
-  const filteredExams = exams.filter(
-    (e) =>
-      e.title.toLowerCase().includes(search.toLowerCase()) ||
-      e.venue.toLowerCase().includes(search.toLowerCase()) ||
-      e.class_name.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter admins based on search and status
+  const filteredAdmins = feesData.admins.filter(admin => {
+    const matchesSearch = admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          admin.role.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = selectedStatus === 'All' || admin.status === selectedStatus.toLowerCase();
+    const matchesRole = selectedRole === 'All' || admin.role === selectedRole;
+    return matchesSearch && matchesStatus && matchesRole;
+  });
+
+  // Get unique roles for filter
+  const uniqueRoles = ['All', ...new Set(feesData.admins.map(a => a.role))];
+
+  // Status badge component
+  const getStatusBadge = (status) => {
+    const statusMap = {
+      paid: { color: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle },
+      partial: { color: 'bg-yellow-50 text-yellow-700 border-yellow-200', icon: Clock },
+      overdue: { color: 'bg-red-50 text-red-700 border-red-200', icon: XCircle },
+      pending: { color: 'bg-blue-50 text-blue-700 border-blue-200', icon: Clock },
+    };
+    const config = statusMap[status] || statusMap.pending;
+    const Icon = config.icon;
+    return (
+      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${config.color}`}>
+        <Icon size={12} />
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
+
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
+  // Get status icon for transactions
+  const getTransactionStatusIcon = (status) => {
+    switch(status) {
+      case 'completed': return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'pending': return <Clock className="h-4 w-4 text-yellow-500" />;
+      case 'failed': return <XCircle className="h-4 w-4 text-red-500" />;
+      default: return <AlertCircle className="h-4 w-4 text-gray-400" />;
+    }
+  };
+
+  // Calculate progress percentage for fee payment
+  const calculateProgress = (paid, total) => {
+    return Math.round((paid / total) * 100);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Top Search Bar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full max-w-md">
-          <svg
-            className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search exams, venues, or students..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-full border border-gray-200 bg-gray-50/50 py-2 pl-10 pr-4 text-sm text-gray-800 placeholder-gray-400 outline-none transition-all focus:border-blue-600 focus:bg-white"
-          />
-        </div>
-      </div>
-
-      {/* Main Section Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold font-serif tracking-tight text-gray-900 sm:text-3xl">
-            Examinations
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage schedules, venues, and view upcoming assessments.
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900">Admin Fees Management</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage admin salaries, track payments, and generate reports</p>
         </div>
-
         <div className="flex items-center gap-3">
           <button
-            type="button"
-            onClick={() => handleQuickAction("Export Schedule")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 active:scale-95 transition-all"
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export
+            <Printer size={16} />
+            Print Report
           </button>
-
           <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-95 transition-all"
+            onClick={() => setIsAssignStudentFeeModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-            </svg>
-            Create Exam
+            <Plus size={16} />
+            Assign Student Fee
+          </button>
+          <button
+            onClick={() => setIsAddFeeModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <Plus size={16} />
+            Add Salary Record
           </button>
         </div>
       </div>
 
-      {/* Notification Toast */}
-      {actionNotice && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-          <svg className="h-4 w-4 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-          </svg>
-          {actionNotice}
+      {/* Summary Cards */}
+      {!loading && !error && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Payroll</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(feesData.summary.totalPayroll)}</p>
+              </div>
+              <div className="p-3 bg-green-50 rounded-lg">
+                <Wallet className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-1 text-sm">
+              <TrendingUp className="h-4 w-4 text-green-500" />
+              <span className="text-green-600 font-medium">+8%</span>
+              <span className="text-gray-500">from last month</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Pending Payments</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(feesData.summary.totalPending)}</p>
+              </div>
+              <div className="p-3 bg-yellow-50 rounded-lg">
+                <Clock className="h-6 w-6 text-yellow-600" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-1 text-sm">
+              <TrendingDown className="h-4 w-4 text-red-500" />
+              <span className="text-red-600 font-medium">-3%</span>
+              <span className="text-gray-500">from last month</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Overdue Amount</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(feesData.summary.totalOverdue)}</p>
+              </div>
+              <div className="p-3 bg-red-50 rounded-lg">
+                <AlertCircle className="h-6 w-6 text-red-600" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-1 text-sm">
+              <span className="text-red-600 font-medium">Urgent</span>
+              <span className="text-gray-500">- Needs attention</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Payment Rate</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{feesData.summary.paymentRate}%</p>
+              </div>
+              <div className="p-3 bg-purple-50 rounded-lg">
+                <Users className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-purple-600 h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${feesData.summary.paymentRate}%` }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Stat Cards Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Upcoming Exams */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Upcoming Exams</p>
-              <p className="mt-3 text-3xl font-bold font-serif text-gray-900">12</p>
-              <p className="mt-2 text-xs font-semibold text-emerald-600">
-                ↗ +2 <span className="font-normal text-gray-400">this week</span>
-              </p>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
+      {/* Filters and Search */}
+      <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="text"
+              placeholder="Search by admin name or role..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
           </div>
-        </div>
-
-        {/* Active Venues */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Active Venues</p>
-              <p className="mt-3 text-3xl font-bold font-serif text-gray-900">08</p>
-              <p className="mt-2 text-xs text-gray-400">All venues operational</p>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Needs Attention */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Needs Attention</p>
-              <p className="mt-3 text-3xl font-bold font-serif text-gray-900">03</p>
-              <p className="mt-2 text-xs font-semibold text-red-600">Missing invigilators</p>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-100 text-red-600">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Papers Graded */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div className="w-full">
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Papers Graded</p>
-              <p className="mt-3 text-3xl font-bold font-serif text-gray-900">64%</p>
-              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                <div className="h-full bg-slate-800 rounded-full" style={{ width: "64%" }} />
-              </div>
-            </div>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 ml-2">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Layout */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Exam Schedule Table Column */}
-        <div className="lg:col-span-2 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h2 className="text-base font-bold font-serif text-gray-900">
-                Upcoming Exam Schedule
-              </h2>
-              <div className="flex items-center gap-2 text-gray-400">
-                <button type="button" className="p-1 hover:text-gray-600">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                  </svg>
-                </button>
-                <button type="button" className="p-1 hover:text-gray-600">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="py-12 text-center text-sm text-gray-500">Loading schedules...</div>
-            ) : filteredExams.length === 0 ? (
-              <div className="py-12 text-center text-sm text-gray-500">No exams found.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50/50 text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                      <th className="py-3.5 pl-6 pr-3">Exam Name</th>
-                      <th className="px-3 py-3.5">Date & Time</th>
-                      <th className="px-3 py-3.5">Venue</th>
-                      <th className="px-3 py-3.5">Status</th>
-                      <th className="py-3.5 pl-3 pr-6 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredExams.map((exam) => (
-                      <tr key={exam.id} className="hover:bg-gray-50/60 transition-colors">
-                        <td className="py-4 pl-6 pr-3">
-                          <p className="text-xs font-bold text-gray-900">{exam.title}</p>
-                          <p className="text-[10px] text-gray-400">{exam.class_name}</p>
-                        </td>
-                        <td className="px-3 py-4">
-                          <p className="text-xs font-bold text-gray-800">{exam.exam_date}</p>
-                          <p className="text-[10px] text-gray-400">{exam.exam_time}</p>
-                        </td>
-                        <td className="px-3 py-4 text-xs font-medium text-gray-700">
-                          {exam.venue}
-                        </td>
-                        <td className="px-3 py-4">
-                          {renderStatusBadge(exam.status)}
-                        </td>
-                        <td className="py-4 pl-3 pr-6 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setDeleteId(exam.id)}
-                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                            title="Delete exam"
-                          >
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          <div className="p-4 border-t border-gray-100 text-center">
-            <button
-              type="button"
-              onClick={() => handleQuickAction("Viewing Full Schedule")}
-              className="text-xs font-bold text-blue-600 hover:underline"
+          <div className="flex gap-3">
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
             >
-              View Full Schedule
+              <option value="All">All Status</option>
+              <option value="Paid">Paid</option>
+              <option value="Partial">Partial</option>
+              <option value="Overdue">Overdue</option>
+              <option value="Pending">Pending</option>
+            </select>
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+            >
+              {uniqueRoles.map(role => (
+                <option key={role} value={role}>{role}</option>
+              ))}
+            </select>
+            <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+              <Filter size={16} />
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Right Sidebar: Quick Actions & Timeline */}
-        <div className="space-y-6">
-          {/* Quick Actions Panel */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-gray-800 mb-4">
-              Quick Actions
-            </h2>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => handleQuickAction("Assign Invigilator")}
-                className="flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 p-3.5 hover:bg-gray-50 active:scale-95 transition-all text-center"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                  </svg>
-                </div>
-                <span className="text-[11px] font-semibold text-gray-700 leading-tight">Assign Invigilator</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickAction("Manage Venues")}
-                className="flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 p-3.5 hover:bg-gray-50 active:scale-95 transition-all text-center"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                </div>
-                <span className="text-[11px] font-semibold text-gray-700 leading-tight">Manage Venues</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickAction("Print Hall Tickets")}
-                className="flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 p-3.5 hover:bg-gray-50 active:scale-95 transition-all text-center"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                  </svg>
-                </div>
-                <span className="text-[11px] font-semibold text-gray-700 leading-tight">Print Hall Tickets</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickAction("Send Alerts")}
-                className="flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 p-3.5 hover:bg-gray-50 active:scale-95 transition-all text-center"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 01-6 0v-1m6 0H9" />
-                  </svg>
-                </div>
-                <span className="text-[11px] font-semibold text-gray-700 leading-tight">Send Alerts</span>
-              </button>
-            </div>
+      {/* Admin Fee Table */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-200">
+          <Loader2 className="animate-spin mb-2 text-gray-400" size={32} />
+          <p className="text-sm text-gray-500">Loading admin fees data...</p>
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center gap-2 p-6 bg-red-50 text-red-600 rounded-xl border border-red-200">
+          <AlertCircle size={20} />
+          <p className="text-sm font-medium">{error}</p>
+          <button 
+            onClick={fetchFeesData}
+            className="ml-3 px-3 py-1 bg-red-100 hover:bg-red-200 rounded-lg text-xs font-medium transition-colors"
+          >
+            <RefreshCw size={14} className="inline mr-1" />
+            Retry
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Admin</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Salary</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Paid</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Due Date</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredAdmins.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-6 py-8 text-center text-sm text-gray-500">
+                      No admins found matching your criteria
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAdmins.map((admin) => (
+                    <tr key={admin.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-semibold text-sm">
+                            {admin.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <span className="text-sm font-medium text-gray-900">{admin.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{admin.role}</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatCurrency(admin.salary)}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-medium text-gray-900">{formatCurrency(admin.paid)}</span>
+                          <div className="w-20 h-1.5 bg-gray-200 rounded-full">
+                            <div 
+                              className="h-full bg-purple-600 rounded-full transition-all duration-500"
+                              style={{ width: `${calculateProgress(admin.paid, admin.salary)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">{getStatusBadge(admin.status)}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{admin.dueDate}</td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedAdmin(admin);
+                              setIsViewModalOpen(true);
+                            }}
+                            className="p-1 text-gray-400 hover:text-purple-600 transition-colors"
+                            title="View Details"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleSendReminder(admin)}
+                            className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                            title="Send Reminder"
+                          >
+                            <Mail size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRecord(admin)}
+                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
+        </div>
+      )}
 
-          {/* Today's Timeline Panel */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-gray-800">
-                Today's Timeline
-              </h2>
-              <span className="text-xs font-medium text-gray-400">Oct 24</span>
-            </div>
-
-            <div className="relative border-l border-gray-200 ml-2 space-y-6 pl-4">
-              {/* Event 1 */}
-              <div className="relative">
-                <span className="absolute -left-[21px] top-1 flex h-3 w-3 items-center justify-center rounded-full border-2 border-emerald-600 bg-white" />
-                <p className="text-[10px] font-bold text-emerald-700">09:00 AM - Ongoing</p>
-                <p className="text-xs font-bold text-gray-900 mt-0.5">Mid-Term Mathematics</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">📍 Main Hall A</p>
+      {/* Recent Transactions */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
+          <button onClick={() => setShowAllTransactions((current) => !current)} className="text-sm text-purple-600 hover:text-purple-700 font-medium">{showAllTransactions ? "Show Recent" : "View All"}</button>
+        </div>
+        <div className="space-y-3">
+          {(showAllTransactions ? feesData.recentTransactions : feesData.recentTransactions.slice(0, 3)).map((transaction) => (
+            <div key={transaction.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+              <div className="flex items-center gap-3">
+                {getTransactionStatusIcon(transaction.status)}
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{transaction.admin}</p>
+                  <p className="text-xs text-gray-500">{transaction.id} • {transaction.method}</p>
+                </div>
               </div>
-
-              {/* Event 2 */}
-              <div className="relative">
-                <span className="absolute -left-[21px] top-1 flex h-3 w-3 items-center justify-center rounded-full border-2 border-gray-400 bg-white" />
-                <p className="text-[10px] font-bold text-gray-500">14:00 PM</p>
-                <p className="text-xs font-bold text-gray-900 mt-0.5">Biology Practical setup</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">🔬 Lab 2</p>
-              </div>
-
-              {/* Event 3 */}
-              <div className="relative">
-                <span className="absolute -left-[21px] top-1 flex h-3 w-3 items-center justify-center rounded-full border-2 border-gray-400 bg-white" />
-                <p className="text-[10px] font-bold text-gray-500">15:30 PM</p>
-                <p className="text-xs font-bold text-gray-900 mt-0.5">Invigilator Briefing</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">👥 Staff Room</p>
+              <div className="text-right">
+                <p className="text-sm font-semibold text-gray-900">{formatCurrency(transaction.amount)}</p>
+                <p className="text-xs text-gray-500">{transaction.date}</p>
               </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* Create Exam Modal */}
-      {showForm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setShowForm(false)}
-        >
-          <div
-            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-base font-bold text-gray-900">Create New Examination</h3>
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+      {/* Assign Student Fee Modal */}
+      {isAssignStudentFeeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Assign Student Fee</h2>
+                <p className="mt-1 text-sm text-gray-500">Create a fee for every student or for one student.</p>
+              </div>
+              <button type="button" onClick={() => setIsAssignStudentFeeModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <XCircle size={24} />
               </button>
             </div>
-
-            <form onSubmit={handleCreateExam} className="mt-4 space-y-4">
+            <form onSubmit={handleAssignStudentFee} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-700">Exam Title</label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Chemistry Mid-Term"
-                  className="mt-1 w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm text-gray-900 outline-none focus:border-blue-600"
-                />
+                <label className="mb-1 block text-sm font-medium text-gray-700">Apply fee to</label>
+                <select value={studentFeeForm.recipient} onChange={(event) => setStudentFeeForm({ ...studentFeeForm, recipient: event.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="all">All students</option>
+                  <option value="individual">One student</option>
+                </select>
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
+              {studentFeeForm.recipient === "individual" && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700">Class Grade</label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Student email or ID</label>
+                  <input type="text" required placeholder="student@example.com or STU-2026-0001" value={studentFeeForm.studentIdentifier} onChange={(event) => setStudentFeeForm({ ...studentFeeForm, studentIdentifier: event.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Amount</label>
+                  <input type="number" min="0" step="0.01" required placeholder="0.00" value={studentFeeForm.amount} onChange={(event) => setStudentFeeForm({ ...studentFeeForm, amount: event.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Due date</label>
+                  <input type="date" required value={studentFeeForm.dueDate} onChange={(event) => setStudentFeeForm({ ...studentFeeForm, dueDate: event.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Semester</label>
+                  <select value={studentFeeForm.semester} onChange={(event) => setStudentFeeForm({ ...studentFeeForm, semester: event.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option>First Semester</option><option>Second Semester</option><option>Third Semester</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Activity or fee type</label>
+                  <input type="text" required placeholder="Tuition, excursion, lab fee..." value={studentFeeForm.activity} onChange={(event) => setStudentFeeForm({ ...studentFeeForm, activity: event.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div className="mt-6 flex gap-3">
+                <button type="button" onClick={() => setIsAssignStudentFeeModalOpen(false)} className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{isSubmitting ? "Assigning..." : "Assign Fee"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Fee Modal */}
+      {isAddFeeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Add Salary Record</h2>
+              <button
+                onClick={() => setIsAddFeeModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+            <form onSubmit={handleAddFee}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Admin Name</label>
                   <input
                     type="text"
                     required
-                    value={className}
-                    onChange={(e) => setClassName(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm text-gray-900 outline-none focus:border-blue-600"
+                    value={formData.adminName}
+                    onChange={(e) => setFormData({...formData, adminName: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Enter admin name"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700">Venue</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData({...formData, role: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="Principal">Principal</option>
+                    <option value="Finance Manager">Finance Manager</option>
+                    <option value="Academic Coordinator">Academic Coordinator</option>
+                    <option value="HR Director">HR Director</option>
+                    <option value="Admissions Officer">Admissions Officer</option>
+                    <option value="IT Director">IT Director</option>
+                    <option value="Administrator">Administrator</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Salary Amount</label>
                   <input
-                    type="text"
+                    type="number"
                     required
-                    value={venue}
-                    onChange={(e) => setVenue(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm text-gray-900 outline-none focus:border-blue-600"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700">Exam Date</label>
-                  <input
-                    type="text"
-                    placeholder="Oct 30, 2023"
-                    value={examDate}
-                    onChange={(e) => setExamDate(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm text-gray-900 outline-none focus:border-blue-600"
+                    value={formData.salary}
+                    onChange={(e) => setFormData({...formData, salary: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Enter salary amount"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700">Time Range</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
                   <input
-                    type="text"
-                    value={examTime}
-                    onChange={(e) => setExamTime(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm text-gray-900 outline-none focus:border-blue-600"
+                    type="date"
+                    required
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({...formData, status: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="partial">Partial</option>
+                    <option value="overdue">Overdue</option>
+                  </select>
+                </div>
               </div>
-
-              <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
+              <div className="flex gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
-                  className="rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                  onClick={() => setIsAddFeeModalOpen(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
-                  {submitting ? "Saving..." : "Save Examination"}
+                  {isSubmitting ? 'Saving...' : 'Add Record'}
                 </button>
               </div>
             </form>
@@ -595,40 +702,78 @@ export function AdminExamsSection() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {deleteId && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setDeleteId(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex flex-col items-center gap-3 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
+      {/* View Admin Modal */}
+      {isViewModalOpen && selectedAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Admin Salary Details</h2>
+              <button
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  setSelectedAdmin(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-semibold text-lg">
+                  {selectedAdmin.name.split(' ').map(n => n[0]).join('')}
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-gray-900">{selectedAdmin.name}</p>
+                  <p className="text-sm text-gray-500">{selectedAdmin.role}</p>
+                </div>
               </div>
-              <h3 className="text-base font-bold text-gray-900">Delete Examination?</h3>
-              <p className="text-xs text-gray-500">
-                Are you sure you want to delete this exam? This action cannot be undone.
-              </p>
-              <div className="mt-2 flex w-full gap-3">
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                <div>
+                  <p className="text-sm text-gray-500">Salary</p>
+                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(selectedAdmin.salary)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Paid</p>
+                  <p className="text-lg font-semibold text-green-600">{formatCurrency(selectedAdmin.paid)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Status</p>
+                  {getStatusBadge(selectedAdmin.status)}
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Due Date</p>
+                  <p className="text-sm font-medium text-gray-900">{selectedAdmin.dueDate}</p>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-gray-200">
+                <p className="text-sm text-gray-500 mb-2">Payment Progress</p>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-purple-600 h-3 rounded-full transition-all duration-500"
+                    style={{ width: `${calculateProgress(selectedAdmin.paid, selectedAdmin.salary)}%` }}
+                  />
+                </div>
+                <p className="text-sm text-gray-600 mt-1">
+                  {calculateProgress(selectedAdmin.paid, selectedAdmin.salary)}% completed
+                </p>
+              </div>
+              <div className="flex gap-3 mt-4">
                 <button
-                  type="button"
-                  onClick={() => setDeleteId(null)}
-                  className="flex-1 rounded-xl border border-gray-200 py-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                  onClick={() => {
+                    setIsViewModalOpen(false);
+                    setSelectedAdmin(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  Cancel
+                  Close
                 </button>
                 <button
-                  type="button"
-                  onClick={() => handleDeleteExam(deleteId)}
-                  className="flex-1 rounded-xl bg-red-600 py-2.5 text-xs font-semibold text-white hover:bg-red-700"
+                  onClick={() => handleSendReminder(selectedAdmin)}
+                  className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  Delete
+                  <Send size={16} className="inline mr-2" />
+                  Send Reminder
                 </button>
               </div>
             </div>
