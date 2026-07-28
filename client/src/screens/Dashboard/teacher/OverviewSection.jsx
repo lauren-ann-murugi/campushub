@@ -130,9 +130,9 @@ export function TeacherOverviewSection({ name = "Teacher", onNavigate }) {
               <div className="py-8 text-center text-xs text-[#434655]">Loading classes...</div>
             ) : (
               <ul className="flex flex-col gap-4">
-                {classesList.map((c) => (
+                {classesList.map((c, index) => (
                   <li
-                    key={c.name}
+                    key={`${c.name}-${index}`}
                     className="flex flex-col gap-2 border-b border-[#eceef0] pb-4 last:border-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex items-center gap-3">
@@ -181,8 +181,8 @@ export function TeacherOverviewSection({ name = "Teacher", onNavigate }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {upcomingExamsList.map((ex) => (
-                      <tr key={ex.name} className="border-b border-[#f0f1f3] last:border-0 hover:bg-[#f7f9fb]/50 transition-colors">
+                    {upcomingExamsList.map((ex, index) => (
+                      <tr key={`${ex.name}-${index}`} className="border-b border-[#f0f1f3] last:border-0 hover:bg-[#f7f9fb]/50 transition-colors">
                         <td className="py-3 text-sm font-medium text-[#191c1e]">{ex.name}</td>
                         <td className="py-3 text-sm text-[#434655]">{ex.date}</td>
                         <td className="py-3 text-right text-sm text-[#434655]">
@@ -207,8 +207,8 @@ export function TeacherOverviewSection({ name = "Teacher", onNavigate }) {
             onAction={() => handleNavigation("exams")}
           >
             <ul className="flex flex-col gap-4">
-              {pendingGradingList.map((g) => (
-                <li key={g.title} className="flex flex-col gap-1">
+              {pendingGradingList.map((g, index) => (
+                <li key={`${g.title}-${index}`} className="flex flex-col gap-1">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-[#191c1e]">{g.title}</p>
                     <span className="text-xs text-[#434655]">
@@ -228,8 +228,8 @@ export function TeacherOverviewSection({ name = "Teacher", onNavigate }) {
 
           <PanelCard title="Attendance Today">
             <ul className="flex flex-col gap-3">
-              {attendanceTodayList.map((a) => (
-                <li key={a.name} className="flex items-center justify-between">
+              {attendanceTodayList.map((a, index) => (
+                <li key={`${a.name}-${index}`} className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-[#191c1e]">{a.name}</p>
                     <p className="text-xs text-[#434655]">
