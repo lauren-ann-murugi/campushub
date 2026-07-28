@@ -93,9 +93,15 @@ import {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
 
+function formatMoney(amount) {
+  const value = Number(amount) || 0;
+  if (value >= 1000) return `$${Math.round(value / 1000)}k`;
+  return `$${value.toFixed(0)}`;
+}
+
 export function AdminDashboard() {
   const router = useRouter();
-  const { displayName, signOut } = useAuth();
+  const { displayName, signOut, user, loading: authLoading } = useAuth();
   
   const [activeTab, setActiveTab] = useState("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
@@ -129,18 +135,31 @@ export function AdminDashboard() {
       const token = authService.getToken();
       if (!token) return;
 
-      const res = await fetch(`${API_BASE_URL}/admin/dashboard-stats`, {
+      const res = await fetch(`${API_BASE_URL}/admin/dashboard`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.ok) {
-        const data = await res.json();
-        if (data.metrics) setMetrics(data.metrics);
-        if (data.pendingAdmissions) setPendingAdmissions(data.pendingAdmissions);
-        if (data.tickets) setSupportTickets(data.tickets);
+        const { stats } = await res.json();
+        if (stats) {
+          setMetrics((current) => ({
+            ...current,
+            totalStudents: {
+              ...current.totalStudents,
+              count: String(stats.total_students),
+              change: `${stats.total_users} portal accounts`,
+            },
+            totalTeachers: { ...current.totalTeachers, count: String(stats.total_teachers) },
+            feeCollection: {
+              ...current.feeCollection,
+              amount: formatMoney(stats.collected_fees_amount),
+              change: `${formatMoney(stats.pending_fees_amount)} outstanding`,
+            },
+          }));
+        }
       }
     } catch (err) {
-      console.warn("Using default frontend dashboard data until FastAPI endpoint responds.", err);
+      console.warn("Using default frontend dashboard data until the API responds.", err);
     } finally {
       setLoading(false);
     }
@@ -149,6 +168,12 @@ export function AdminDashboard() {
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/login");
+    }
+  }, [authLoading, user, router]);
 
   // Sidebar navigation configuration
   const navigationItems = [
