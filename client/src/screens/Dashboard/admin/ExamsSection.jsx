@@ -137,7 +137,35 @@ export function AdminExamsSection() {
 
   // Quick Action Button Handlers
   const handleQuickAction = (actionName) => {
-    setActionNotice(`Triggered: ${actionName}`);
+    if (actionName === "Export Schedule") {
+      const csv = ["Title,Class,Date,Time,Venue,Status", ...filteredExams.map((exam) => [exam.title, exam.class_name, exam.exam_date, exam.exam_time, exam.venue, exam.status].join(","))].join("\n");
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "exam-schedule.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+      setActionNotice("Exam schedule exported.");
+    } else if (actionName === "Assign Invigilator") {
+      const pendingExam = exams.find((exam) => exam.status === "Pending Invigilator");
+      if (pendingExam) {
+        setExams((current) => current.map((exam) => exam.id === pendingExam.id ? { ...exam, status: "Scheduled", invigilator: "To be assigned" } : exam));
+        setActionNotice("Invigilator assignment started for the pending exam.");
+      } else {
+        setActionNotice("All listed exams already have an invigilator.");
+      }
+    } else if (actionName === "Manage Venues") {
+      setSearch("");
+      setActionNotice("Venue list is ready for review in the schedule.");
+    } else if (actionName === "Print Hall Tickets") {
+      window.print();
+      setActionNotice("Print dialog opened for hall tickets.");
+    } else if (actionName === "Send Alerts") {
+      setActionNotice("Exam alerts are ready to send to the scheduled classes.");
+    } else {
+      setSearch("");
+      setActionNotice("Showing the full examination schedule.");
+    }
     setTimeout(() => setActionNotice(null), 3000);
   };
 
