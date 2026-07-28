@@ -85,6 +85,7 @@ export function AdminStudentsSection() {
     class_section: "Grade 10 - A",
     guardian_name: "",
     guardian_phone: "",
+    email: "",
     guardian_relation: "Mother",
     status: "Active",
   });
@@ -247,6 +248,7 @@ export function AdminStudentsSection() {
       guardian_name: newStudent.guardian_name,
       guardian_relation: newStudent.guardian_relation,
       guardian_phone: newStudent.guardian_phone || "+1 (555) 000-0000",
+      email: newStudent.email,
       status: newStudent.status,
       avatar_url: null,
       created_at: new Date().toISOString(),
@@ -269,6 +271,7 @@ export function AdminStudentsSection() {
         class_section: "Grade 10 - A",
         guardian_name: "",
         guardian_phone: "",
+        email: "",
         guardian_relation: "Mother",
         status: "Active",
       });
@@ -650,6 +653,17 @@ export function AdminStudentsSection() {
                 </div>
               </div>
 
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-[#434655]">Student Email</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="student@example.com"
+                    value={newStudent.email}
+                    onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-[#c3c6d7] p-2 text-sm text-[#191c1e]"
+                  />
+                </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-[#434655]">Date of Birth</label>
